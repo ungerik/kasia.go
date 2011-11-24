@@ -395,9 +395,9 @@ func parse1(txt *[]byte, lnum *int, stab map[string]string, txt_sep string) (
                 }
             }
 
-            // Wyrazenie powinno konczyc sie dwukropkiem.
+            // Wyrazenie konczy sie dwukropkiem.
             if frag[0] != ':' {
-                err = ParseErr{*lnum, PARSE_COLON_ERR}
+                err = ParseErr{*lnum, PARSE_IF_ERR}
                 return
             }
             frag = frag[1:]
@@ -490,7 +490,7 @@ func parse1(txt *[]byte, lnum *int, stab map[string]string, txt_sep string) (
             }
             // Wyrazenie konczy sie dwukropkiem.
             if frag[0] != ':' {
-                err = ParseErr{*lnum, PARSE_COLON_ERR}
+                err = ParseErr{*lnum, PARSE_FOR_ERR}
                 return
             }
             frag = frag[1:]
@@ -498,31 +498,23 @@ func parse1(txt *[]byte, lnum *int, stab map[string]string, txt_sep string) (
 
             elems = append(elems, &ForElem{*lnum, inc, iter, val, vf, nil, nil})
 
-        case "else", "defer":
+        case "else":
             // Pomijamy ewentualne biale znaki
             err = skipWhite(&frag, lnum)
             if err != nil {
                 return
             }
             if frag[0] != ':' {
-                err = ParseErr{*lnum, PARSE_COLON_ERR}
+                err = ParseErr{*lnum, PARSE_ELSE_ERR}
                 return
             }
             frag = frag[1:]
             skipNewline(&frag, lnum)
 
-			if symbol[0] == 'e' {
-				elems = append(elems, &ElseElem{*lnum})
-			} else {
-				elems = append(elems, &DeferElem{*lnum, nil})
-			}
+            elems = append(elems, &ElseElem{*lnum})
 
         case "end":
             elems = append(elems, &EndElem{*lnum})
-            skipNewline(&frag, lnum)
-
-		case "return":
-			elems = append(elems, &ReturnElem{*lnum})
             skipNewline(&frag, lnum)
 
         case "":

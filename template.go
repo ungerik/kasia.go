@@ -184,24 +184,7 @@ func execVarFun(wr io.Writer, vf *VarFunElem, ctx []interface{}, strict bool) (
 
 // Public methods
 
-func (tpl *Template) Run(wr io.Writer, ctx ...interface{}) (err os.Error) {
-	var defer_out [][]byte
-	_, err = tpl.run(wr, &defer_out, ctx...)
-	if err != nil {
-		return
-	}
-	// Defered output in reversed order
-	for i := len(defer_out)-1; i >= 0; i-- {
-		_, err = wr.Write(defer_out[i])
-		if err != nil {
-			return
-		}
-	}
-	return
-}
-
-func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
-		ctx ...interface{}) (ret bool, err os.Error) {
+func (tpl *Template) Run(wr io.Writer, ctx ...interface{}) (err os.Error){
     for _, va := range tpl.elems {
         switch el := va.(type) {
         case *TxtElem:
@@ -226,15 +209,13 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                 // Zagniezdzony szablon
                 err = vtn.Run(wr, ctx...)
                 if err != nil {
-                    err = RunErr{el.ln, RUN_NESTED, err}
-					return
+                    return RunErr{el.ln, RUN_NESTED, err}
                 }
             case NestedTemplate:
                 // Zagniezdzony szablon z wlasnym kontekstem
                 err = vtn.tpl.Run(wr, vtn.ctx...)
                 if err != nil {
-                    err = RunErr{el.ln, RUN_NESTED, err}
-					return
+                    return RunErr{el.ln, RUN_NESTED, err}
                 }
             case []byte:
                 // Raw text
@@ -275,8 +256,7 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                 var stat int
                 tf, stat = getCmp(v1, v2, el.cmp)
                 if stat != RUN_OK {
-                    err = RunErr{el.ln, stat, nil}
-					return
+                    return RunErr{el.ln, stat, nil}
                 }
             }
             // Aby wyswietlic blok if'a tworzymy kopie glownego szablonu.
@@ -288,8 +268,8 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                 ift.elems = el.false_block
             }
             // Renderujemy szablon wybranego bloku.
-            ret, err = ift.run(wr, defer_out, ctx...)
-            if ret || err != nil {
+            err = ift.Run(wr, ctx...)
+            if err != nil {
                 return
             }
 
@@ -319,24 +299,23 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                             local_ctx[el.val] = nil
                         }
                         local_ctx[el.iter] = ii + el.iter_inc
-                        ret, err = for_tpl.run(wr, defer_out, for_ctx...)
-                        if ret || err != nil {
+                        err = for_tpl.Run(wr, for_ctx...)
+                        if err != nil {
                             return
                         }
                     }
                 } else {
                     // Pusta tablica
                     for_tpl.elems = el.else_block
-                    ret, err = for_tpl.run(wr, defer_out, ctx...)
-                    if ret || err != nil {
+                    err = for_tpl.Run(wr, ctx...)
+                    if err != nil {
                         return
                     }
                 }
             case reflect.Map:
                 if val.Len() != 0 {
                     if el.iter_inc != 0 {
-                        err = RunErr{el.ln, RUN_INC_MAP_KEY, nil}
-						return
+                        return RunErr{el.ln, RUN_INC_MAP_KEY, nil}
                     }
                     for_tpl.elems = el.iter_block
                     // Tworzymy kontekst dla iteracyjnego bloku for
@@ -350,16 +329,16 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                             local_ctx[el.val] = nil
                         }
                         local_ctx[el.iter] = key.Interface()
-                        ret, err = for_tpl.run(wr, defer_out, for_ctx...)
-                        if ret || err != nil {
+                        err = for_tpl.Run(wr, for_ctx...)
+                        if err != nil {
                             return
                         }
                     }
                 } else {
                     // Pusty slownik
                     for_tpl.elems = el.else_block
-                    ret, err = for_tpl.run(wr, defer_out, ctx...)
-                    if ret || err != nil {
+                    err = for_tpl.Run(wr, ctx...)
+                    if err != nil {
                         return
                     }
                 }
@@ -380,8 +359,8 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                         local_ctx[el.val] = nil
                     }
                     local_ctx[el.iter] = ii
-                    ret, err = for_tpl.run(wr, defer_out, for_ctx...)
-                    if ret || err != nil {
+                    err = for_tpl.Run(wr, for_ctx...)
+                    if err != nil {
                         return
                     }
                     ii++
@@ -389,23 +368,22 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                 if ii == el.iter_inc {
                     // Nic nie odebralismy z kanalu
                     for_tpl.elems = el.else_block
-                    ret, err = for_tpl.run(wr, defer_out, ctx...)
-                    if ret || err != nil {
+                    err = for_tpl.Run(wr, ctx...)
+                    if err != nil {
                         return
                     }
                 }
            case reflect.Invalid:
                 for_tpl.elems = el.else_block
-                ret, err = for_tpl.run(wr, defer_out, ctx...)
-                if ret || err != nil {
+                err = for_tpl.Run(wr, ctx...)
+                if err != nil {
                     return
                 }
             default:
                 // Zmienna jest skalarem, różnym od nil
                 for_tpl.elems = el.iter_block
-                ret, err = for_tpl.run(
+                err = for_tpl.Run(
                     wr,
-					defer_out,
                     append(
                         ctx,
                         map[string]interface{} {
@@ -414,31 +392,12 @@ func (tpl *Template) run(wr io.Writer, defer_out *[][]byte,
                         },
                     )...
                 )
-                if ret || err != nil {
+                if err != nil {
                     return
                 }
             }
 
-		case *ReturnElem:
-			ret = true
-			return
-
-		case *DeferElem:
-			buf := new(bytes.Buffer)
-			// Tworzymy kopie glonego szablonu dla bloku defer
-			defer_tpl := *tpl
-			// W kopii podmieniamy liste elementow na liste bloku defer
-			defer_tpl.elems = el.defer_block
-			// Uruchamiamy blok defer a jego wyjscie zapisujemy w buforze
-			_, err = defer_tpl.run(buf, defer_out, ctx...)
-			if err != nil {
-				return
-			}
-			// Zapisujemy wynik na stos opoznionego wyjscia
-			*defer_out = append(*defer_out, buf.Bytes())
-
         default:
-			panic(fmt.Sprintln("Blaa!:", el))
             panic("tmpl:exec: Unknown element!")
         }
     }
